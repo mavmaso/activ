@@ -1,0 +1,15 @@
+version: "3.2"
+services:
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    container_name: activ_db
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: activ_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+volumes:
+  postgres_data:
