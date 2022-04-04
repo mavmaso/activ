@@ -1,22 +1,41 @@
-use activ::run;
+use activ::startup::run;
 use std::net::TcpListener;
+use sqlx::{PgConnection, Connection, PgPool};
+use activ::config::get_configuration;
 
-fn spawn_app() -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+pub struct TestApp {
+    pub addr: String,
+    pub db_pool: PgPool,
+    }
+
+async fn spawn_app() -> TestApp {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
-    let server = run(listener).expect("Failed to bind address");
+    let addr = format!("http://127.0.0.1:{}", port);
+
+    let config = get_configuration().expect("Failed to read config");
+    let db_pool = PgPool::connect(&config.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres");
+
+    let server = run(listener, db_pool.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
-    format!("http://127.0.0.1:{}", port)
+    TestApp {
+        addr,
+        db_pool,
+    }
+    
 }
 
 #[tokio::test]
 async fn health_check_works() {
-    let address = spawn_app();
+    let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/health_check", &address))
+        .get(&format!("{}/health_check", &app.addr))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -27,11 +46,11 @@ async fn health_check_works() {
 
 #[tokio::test]
 async fn home_works() {
-    let address = spawn_app();
+    let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/", &address))
+        .get(&format!("{}/", &app.addr))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -41,12 +60,18 @@ async fn home_works() {
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
-    let app_address = spawn_app();
+    let app = spawn_app().await;
     let client = reqwest::Client::new();
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let connection_string = configuration.database.connection_string();
+    let mut connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
 
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
-        .post(&format!("{}/subscriptions", &app_address))
+        .post(&format!("{}/subscriptions", &app.addr))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -54,33 +79,13 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
-}
 
-#[tokio::test]
-async fn subscribe_returns_a_400_when_data_is_missing() {
-    let app_address = spawn_app();
-    let client = reqwest::Client::new();
+    assert_eq!(200, response.status().as_u16());
+        let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
+        .fetch_one(&mut connection)
+        .await
+        .expect("Failed to fetch saved subscription.");
 
-    let test_cases = vec![
-        ("name=le%20guin", "missing the email"),
-        ("email=ursula_le_guin%40gmail.com", "missing the name"),
-        ("", "missing both name and email"),
-    ];
-
-    for (invalid_body, error_message) in test_cases {
-        let response = client
-            .post(&format!("{}/subscriptions", &app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
-
-        assert_eq!(
-            400,
-            response.status().as_u16(),
-            "The API did not fail with 400 Bad Request when the payload was {}.",
-            error_message
-        );
-    }
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
 }

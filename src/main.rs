@@ -1,8 +1,16 @@
-use activ::run;
+use activ::config::get_configuration;
+use activ::startup::run;
 use std::net::TcpListener;
+use sqlx::PgPool;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let address = TcpListener::bind("127.0.0.1:8000")?;
-    run(address)?.await
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    let db_poll = PgPool::connect(&configuration.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    let address = format!("127.0.0.1:{}", configuration.application_port);
+    let listener = TcpListener::bind(address)?;
+    run(listener, db_poll)?.await
 }
