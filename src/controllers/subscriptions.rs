@@ -20,15 +20,15 @@ async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> Htt
         form.email,
         form.name,
         Utc::now()
-        )
-        .execute(db_pool.get_ref());
+    )
+    .execute(db_pool.get_ref());
 
-    match query.await{
-            Ok(_) => HttpResponse::Ok().finish(),
+    match query.await {
+        Ok(_) => HttpResponse::Ok().finish(),
 
-            Err(e) => {
-                println!("Failed to execute query: {}", e);
-                HttpResponse::InternalServerError().finish()
-            }
+        Err(e) => {
+            println!("Failed to execute query: {}", e);
+            HttpResponse::InternalServerError().finish()
         }
+    }
 }

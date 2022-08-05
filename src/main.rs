@@ -1,7 +1,7 @@
 use activ::config::get_configuration;
 use activ::startup::run;
-use std::net::TcpListener;
 use sqlx::PgPool;
+use std::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {

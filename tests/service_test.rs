@@ -1,16 +1,15 @@
-use activ::startup::run;
-use std::net::TcpListener;
-use sqlx::{PgConnection, Connection, PgPool};
 use activ::config::get_configuration;
+use activ::startup::run;
+use sqlx::{Connection, PgConnection, PgPool};
+use std::net::TcpListener;
 
 pub struct TestApp {
     pub addr: String,
     pub db_pool: PgPool,
-    }
+}
 
 async fn spawn_app() -> TestApp {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .expect("Failed to bind random port");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let addr = format!("http://127.0.0.1:{}", port);
 
@@ -22,11 +21,7 @@ async fn spawn_app() -> TestApp {
     let server = run(listener, db_pool.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
-    TestApp {
-        addr,
-        db_pool,
-    }
-    
+    TestApp { addr, db_pool }
 }
 
 #[tokio::test]
@@ -81,7 +76,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(200, response.status().as_u16());
 
     assert_eq!(200, response.status().as_u16());
-        let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
         .fetch_one(&mut connection)
         .await
         .expect("Failed to fetch saved subscription.");
