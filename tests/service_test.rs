@@ -99,3 +99,27 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
 }
+
+#[tokio::test]
+async fn subscribe_returns_a_400_when_invalid_data(){
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        ("name=Pedro", "missing the email"),
+        ("email=endereco%40mail.com", "missing the name"),
+        ("", "missing both name and email")
+    ];
+
+    for (body, msg) in test_cases {
+        let response = client
+            .post(&format!("{}/subscriptions", &app.addr))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        
+        assert_eq!(400, response.status().as_u16(), "{}", msg);
+    };
+}
