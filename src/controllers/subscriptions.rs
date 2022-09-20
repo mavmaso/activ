@@ -3,14 +3,14 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct FormData {
     email: String,
     name: String,
 }
 
 #[post("/subscriptions")]
-async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> HttpResponse {
+async fn subscribe(form: web::Json<FormData>, db_pool: web::Data<PgPool>) -> HttpResponse {
     let query = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
